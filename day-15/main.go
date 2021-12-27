@@ -11,10 +11,9 @@ import (
 const inputFilePath = "input.txt"
 
 type MinimumDistanceTracker struct {
-	minimumDistanceMap    map[int]map[int]int
-	processedNodesMap     map[int]map[int]bool
-	nodeProcessingQueue   [][]int
-	addedForProcessingMap map[int]map[int]bool
+	minimumDistanceMap  map[int]map[int]int
+	processedNodesMap   map[int]map[int]bool
+	nodeProcessingQueue [][]int
 }
 
 func main() {
@@ -24,17 +23,69 @@ func main() {
 		log.Fatal(err)
 	}
 
-	answer2 := 0
-
 	source := []int{0, 0}
+
 	destination := []int{len(caveGrid) - 1, len(caveGrid[0]) - 1}
-
 	minimumDistance := calculateMinimumDistance(caveGrid, source, destination)
-
 	answer1 := minimumDistance
+
+	fullMap := getFullMap(caveGrid)
+	destinationFullMap := []int{len(fullMap) - 1, len(fullMap[0]) - 1}
+	minimumDistanceFullMap := calculateMinimumDistance(fullMap, source, destinationFullMap)
+	answer2 := minimumDistanceFullMap
 
 	log.Printf("Answer #1 :: %d", answer1)
 	log.Printf("Answer #2 :: %d", answer2)
+}
+
+func getFullMap(caveGrid [][]int) [][]int {
+	fullMap := make([][]int, len(caveGrid))
+
+	// repeat tiles for first row of 5X5
+	for repeatIndex := 0; repeatIndex < 5; repeatIndex++ {
+		for rowIndex := 0; rowIndex < len(caveGrid); rowIndex++ {
+			if repeatIndex == 0 {
+				fullMap[rowIndex] = make([]int, len(caveGrid[0])*5)
+			}
+
+			fullMapBaseColumnIndex := repeatIndex * len(caveGrid[0])
+
+			for columnIndex := 0; columnIndex < len(caveGrid[0]); columnIndex++ {
+				if repeatIndex > 0 {
+					newColumnIndex := fullMapBaseColumnIndex + columnIndex
+					prevColumnValueToIncrease := fullMap[rowIndex][newColumnIndex-len(caveGrid[0])]
+
+					if prevColumnValueToIncrease == 9 {
+						fullMap[rowIndex][newColumnIndex] = 1
+					} else {
+						fullMap[rowIndex][newColumnIndex] = prevColumnValueToIncrease + 1
+					}
+				} else {
+					fullMap[rowIndex][columnIndex] = caveGrid[rowIndex][columnIndex]
+				}
+			}
+		}
+	}
+
+	// repeat for remaining rows of full map
+	for repeatIndex := len(caveGrid); repeatIndex < len(caveGrid)*5; repeatIndex++ {
+		fullMap = append(fullMap, make([]int, len(fullMap[0])))
+
+		newRowIndex := len(fullMap) - 1
+		prevRowIndex := newRowIndex - len(caveGrid)
+
+		for columnIndex := 0; columnIndex < len(fullMap[0]); columnIndex++ {
+			prevColumnValueToIncrease := fullMap[prevRowIndex][columnIndex]
+
+			if prevColumnValueToIncrease == 9 {
+				fullMap[newRowIndex][columnIndex] = 1
+			} else {
+				fullMap[newRowIndex][columnIndex] = prevColumnValueToIncrease + 1
+			}
+		}
+	}
+
+	return fullMap
 }
 
 func calculateMinimumDistance(caveGrid [][]int, source []int, destination []int) int {
@@ -47,6 +98,14 @@ func calculateMinimumDistance(caveGrid [][]int, source []int, destination []int)
 	minimumDistanceTracker.addNodeToProcessNext(source[0], source[1])
 
 	for node, ok := minimumDistanceTracker.getNextNodeToProcess(); ok; node, ok = minimumDistanceTracker.getNextNodeToProcess() {
+		if minimumDistanceTracker.isNodeProcessed(node[0], node[1]) {
+			continue
+		}
+
+		if node[0] == destination[0] && node[1] == destination[1] {
+			break
+		}
+
 		minimumDistanceTracker.markNodeProcessed(node[0], node[1])
 		baseMinDistanceTrackedOfNode, _ := minimumDistanceTracker.getMinimumDistanceTracked(node[0], node[1])
 
@@ -144,24 +203,43 @@ func (tracker *MinimumDistanceTracker) isNodeProcessed(rowIndex int, columnIndex
 }
 
 func (tracker *MinimumDistanceTracker) addNodeToProcessNext(rowIndex int, columnIndex int) {
-	if _, ok := tracker.processedNodesMap[rowIndex]; ok {
-		if _, ok := tracker.processedNodesMap[rowIndex][columnIndex]; ok {
-			return
-		}
-	}
-
 	tracker.nodeProcessingQueue = append(tracker.nodeProcessingQueue, []int{rowIndex, columnIndex})
 }
 
+// TODO speed can be improved here using min heap
 func (tracker *MinimumDistanceTracker) getNextNodeToProcess() ([]int, bool) {
 	if len(tracker.nodeProcessingQueue) == 0 {
 		return []int{}, false
 	}
 
-	nextNode := (tracker.nodeProcessingQueue)[0]
-	tracker.nodeProcessingQueue = (tracker.nodeProcessingQueue)[1:]
+	minNodeIndex := -1
+	var minNode []int
 
-	return nextNode, true
+	for index, nodeAvailable := range tracker.nodeProcessingQueue {
+		if minNodeIndex == -1 {
+			minNode = nodeAvailable
+			minNodeIndex = index
+		} else {
+			if tracker.minimumDistanceMap[minNode[0]][minNode[1]] > tracker.minimumDistanceMap[nodeAvailable[0]][nodeAvailable[1]] {
+				minNodeIndex = index
+				minNode = nodeAvailable
+			}
+		}
+	}
+
+	newProcessingQueue := make([][]int, 0)
+
+	if minNodeIndex > 0 {
+		newProcessingQueue = append(newProcessingQueue, tracker.nodeProcessingQueue[0:minNodeIndex]...)
+	}
+
+	if minNodeIndex < len(tracker.nodeProcessingQueue)-1 {
+		newProcessingQueue = append(newProcessingQueue, tracker.nodeProcessingQueue[minNodeIndex+1:]...)
+	}
+
+	tracker.nodeProcessingQueue = newProcessingQueue
+
+	return minNode, true
 }
 
 func isDestination(caveGrid [][]int, trackLocation []int) bool {
