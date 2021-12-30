@@ -18,6 +18,13 @@ type TargetArea struct {
 	yMax int
 }
 
+type Position struct {
+	xPos int
+	yPos int
+	xVel int
+	yVel int
+}
+
 func main() {
 	targetArea, err := getInput()
 
@@ -26,10 +33,72 @@ func main() {
 	}
 
 	answer1 := getHighestYPositon(targetArea)
-	answer2 := 0
+	answer2 := countNumberOfInitialVelocities(targetArea)
 
 	log.Printf("Answer #1 :: %d", answer1)
 	log.Printf("Answer #2 :: %d", answer2)
+}
+
+func countNumberOfInitialVelocities(targetArea TargetArea) int {
+	count := 0
+
+	for xVel := 0; xVel <= targetArea.xMax; xVel++ {
+		for yVel := targetArea.yMin; yVel <= int(math.Abs(float64(targetArea.yMin))); yVel++ {
+			position := Position{
+				xPos: 0,
+				yPos: 0,
+				xVel: xVel,
+				yVel: yVel,
+			}
+
+			for true {
+				nextPosition := getNextPosition(position)
+
+				if isPositionInTargetArea(nextPosition, targetArea) {
+					count++
+					break
+				}
+
+				if nextPosition.xVel == 0 && (nextPosition.xPos < targetArea.xMin || nextPosition.xPos > targetArea.xMax) {
+					break
+				}
+
+				if nextPosition.yPos < targetArea.yMin {
+					break
+				}
+
+				position = nextPosition
+			}
+		}
+	}
+
+	return count
+}
+
+func isPositionInTargetArea(position Position, targetArea TargetArea) bool {
+	if position.xPos < targetArea.xMin || position.xPos > targetArea.xMax {
+		return false
+	}
+
+	if position.yPos < targetArea.yMin || position.yPos > targetArea.yMax {
+		return false
+	}
+
+	return true
+}
+
+func getNextPosition(position Position) Position {
+	newPosition := Position{}
+	newPosition.xPos = position.xPos + position.xVel
+	newPosition.yPos = position.yPos + position.yVel
+
+	if position.xVel > 0 {
+		newPosition.xVel = position.xVel - 1
+	}
+
+	newPosition.yVel = position.yVel - 1
+
+	return newPosition
 }
 
 func getHighestYPositon(targetArea TargetArea) int {
